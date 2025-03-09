@@ -175,7 +175,7 @@ export class RiscoClient {
    */
   async getArmedState(): Promise<ArmState> {
     if (!this.accessToken || !this.sessionId) {
-      this.reAuthenticate();
+      await this.reAuthenticate();
     }
 
     try {
@@ -213,7 +213,7 @@ export class RiscoClient {
    */
   async setArmedState(state: ArmState): Promise<void> {
     if (!this.accessToken || !this.sessionId) {
-      this.reAuthenticate();
+      await this.reAuthenticate();
     }
 
     try {

@@ -2,7 +2,7 @@
   "name": "homebridge-risco-lite",
   "displayName": "Homebridge Risco Lite",
   "type": "module",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "description": "A simple homebridge plugin to arm and disarm Risco alarm systems.",
   "author": "ranmee",
   "license": "Apache-2.0",
