@@ -1,8 +1,7 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "RiscoAlarmLite",
   "pluginType": "platform",
   "singular": true,
-  "strictValidation": false,
   "schema": {
     "type": "object",
     "properties": {
@@ -10,7 +9,27 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
+        "default": "Risco Alarm"
+      },
+      "riscoUsername": {
+        "title": "Risco Username",
+        "type": "string",
+        "required": true
+      },
+      "riscoPassword": {
+        "title": "Risco Password",
+        "type": "string",
+        "required": true
+      },
+      "riscoSiteId": {
+        "title": "Risco Site ID",
+        "type": "integer",
+        "required": true
+      },
+      "riscoPIN": {
+        "title": "Risco PIN",
+        "type": "string",
+        "required": true
       }
     }
   }

@@ -1,148 +1,232 @@
 import type { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
-
-import type { ExampleHomebridgePlatform } from './platform.js';
+import { ArmState } from './lib/riscoClient.js';
+import type { RiscoAlarmPlatform } from './platform.js';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Security System States in HomeKit:
+ * 0 = STAY_ARM     / Home - Some sensors are active
+ * 1 = AWAY_ARM     / Away - All sensors are active
+ * 2 = NIGHT_ARM    / Night - Subset of sensors are active
+ * 3 = DISARMED     / Off - All sensors inactive
+ * 4 = ALARM_TRIGGERED / Alarm is triggered
  */
-export class ExamplePlatformAccessory {
+export class RiscoSecuritySystemAccessory {
   private service: Service;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
+  // Store both current and target states
+  private securityState = {
+    currentState: 3, // Start DISARMED
+    targetState: 3,  // Start DISARMED
+    isConnected: true,
   };
 
   constructor(
-    private readonly platform: ExampleHomebridgePlatform,
+    private readonly platform: RiscoAlarmPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Risco')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Security System')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.id || 'Unknown');
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
-
-    if (accessory.context.device.CustomService) {
-      // This is only required when using Custom Services and Characteristics not support by HomeKit
-      this.service = this.accessory.getService(this.platform.CustomServices[accessory.context.device.CustomService]) ||
-        this.accessory.addService(this.platform.CustomServices[accessory.context.device.CustomService]);
-    } else {
-      this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
-    }
+    // get the SecuritySystem service if it exists, otherwise create a new SecuritySystem service
+    this.service = this.accessory.getService(this.platform.Service.SecuritySystem) || 
+      this.accessory.addService(this.platform.Service.SecuritySystem);
 
     // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name || 'Risco Alarm');
 
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
+    // register handlers for the SecuritySystemCurrentState Characteristic
+    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemCurrentState)
+      .onGet(this.getCurrentState.bind(this));
 
-    // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this)) // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this)); // GET - bind to the `getOn` method below
+    // register handlers for the SecuritySystemTargetState Characteristic
+    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemTargetState)
+      .onSet(this.setTargetState.bind(this))
+      .onGet(this.getTargetState.bind(this));
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this)); // SET - bind to the `setBrightness` method below
-
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same subtype id.)
-     */
-
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name')
-      || this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name')
-      || this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
-
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    // Initialize the current state
+    this.updateCurrentState();
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Convert Risco ArmState to HomeKit security state
    */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
-
-    this.platform.log.debug('Set Characteristic On ->', value);
+  private riscoToHomeKit(armState: ArmState): number {
+    switch (armState) {
+      case ArmState.NotArmed:
+        return 3; // DISARMED
+      case ArmState.StayArmed:
+        return 0; // STAY_ARM
+      case ArmState.AwayArmed:
+        return 1; // AWAY_ARM
+      default:
+        return 3; // Default to DISARMED
+    }
   }
 
   /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possible. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-   * In this case, you may decide not to implement `onGet` handlers, which may speed up
-   * the responsiveness of your device in the Home app.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
+   * Convert HomeKit security state to Risco ArmState
    */
-  async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
-
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
+  private homeKitToRisco(state: number): ArmState {
+    switch (state) {
+      case 0: // STAY_ARM
+        return ArmState.StayArmed;
+      case 1: // AWAY_ARM
+        return ArmState.AwayArmed;
+      case 2: // NIGHT_ARM (treat as Stay)
+        return ArmState.StayArmed;
+      case 3: // DISARMED
+        return ArmState.NotArmed;
+      default:
+        return ArmState.NotArmed;
+    }
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
+   * Get a human-readable description of the security state
    */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
+  private getStateDescription(state: number): string {
+    switch (state) {
+      case 0:
+        return 'STAY_ARM (Home)';
+      case 1:
+        return 'AWAY_ARM (Away)';
+      case 2:
+        return 'NIGHT_ARM (Night)';
+      case 3:
+        return 'DISARMED (Off)';
+      case 4:
+        return 'ALARM_TRIGGERED';
+      default:
+        return `Unknown (${state})`;
+    }
+  }
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+  /**
+   * Update the current state from Risco
+   */
+  private async updateCurrentState(): Promise<void> {
+    try {
+      const riscoState = await this.platform.riscoClient.getArmedState();
+      const homekitState = this.riscoToHomeKit(riscoState);
+      
+      this.securityState.currentState = homekitState;
+      this.securityState.targetState = homekitState;
+      
+      this.service.updateCharacteristic(
+        this.platform.Characteristic.SecuritySystemCurrentState,
+        homekitState,
+      );
+      this.service.updateCharacteristic(
+        this.platform.Characteristic.SecuritySystemTargetState,
+        homekitState,
+      );
+    } catch (error) {
+      this.platform.log.error('Failed to update current state:', error);
+      this.securityState.isConnected = false;
+    }
+  }
+
+  /**
+   * Handle "GET" requests from HomeKit for current state
+   */
+  async getCurrentState(): Promise<CharacteristicValue> {
+    if (!this.securityState.isConnected) {
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
+
+    try {
+      const riscoState = await this.platform.riscoClient.getArmedState();
+      const homekitState = this.riscoToHomeKit(riscoState);
+      this.securityState.currentState = homekitState;
+
+      this.platform.log.debug(
+        'Get CurrentState ->',
+        this.getStateDescription(homekitState),
+      );
+
+      return homekitState;
+    } catch (error) {
+      this.platform.log.error('Failed to get current state:', error);
+      this.securityState.isConnected = false;
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
+  }
+
+  /**
+   * Handle "GET" requests from HomeKit for target state
+   */
+  async getTargetState(): Promise<CharacteristicValue> {
+    if (!this.securityState.isConnected) {
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
+
+    try {
+      const riscoState = await this.platform.riscoClient.getArmedState();
+      const homekitState = this.riscoToHomeKit(riscoState);
+      this.securityState.targetState = homekitState;
+
+      this.platform.log.debug(
+        'Get TargetState ->',
+        this.getStateDescription(homekitState),
+      );
+
+      return homekitState;
+    } catch (error) {
+      this.platform.log.error('Failed to get target state:', error);
+      this.securityState.isConnected = false;
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
+  }
+
+  /**
+   * Handle "SET" requests from HomeKit for target state
+   */
+  async setTargetState(value: CharacteristicValue) {
+    if (!this.securityState.isConnected) {
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
+
+    const newState = value as number;
+    this.platform.log.info(
+      'Setting target state to:',
+      this.getStateDescription(newState),
+    );
+
+    try {
+      const riscoState = this.homeKitToRisco(newState);
+      await this.platform.riscoClient.setArmedState(riscoState);
+      
+      // Update both target and current state
+      this.securityState.targetState = newState;
+      this.securityState.currentState = newState;
+      
+      this.service.updateCharacteristic(
+        this.platform.Characteristic.SecuritySystemCurrentState,
+        newState,
+      );
+
+      this.platform.log.info(
+        'Successfully changed alarm state to:',
+        this.getStateDescription(newState),
+      );
+    } catch (error) {
+      this.platform.log.error('Failed to set alarm state:', error);
+      throw new this.platform.api.hap.HapStatusError(
+        this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
+      );
+    }
   }
 }

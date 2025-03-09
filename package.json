@@ -1,22 +1,24 @@
 {
-  "name": "homebridge-plugin-name",
-  "displayName": "Plugin Name",
+  "name": "homebridge-risco-lite",
+  "displayName": "Homebridge Risco Lite",
   "type": "module",
-  "version": "1.0.0",
-  "private": true,
-  "description": "A short description about what your plugin does.",
-  "author": "Your Name",
+  "version": "1.0.1",
+  "description": "A simple homebridge plugin to arm and disarm Risco alarm systems.",
+  "author": "ranmee",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/USERNAME/GITHUB_PROJECT_NAME#readme",
+  "homepage": "https://github.com/ranmee/homebridge-risco-lite#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "https://github.com/ranmee/homebridge-risco-lite.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/ranmee/homebridge-risco-lite/issues"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge-plugin",
+    "risco",
+    "alarm",
+    "security"
   ],
   "main": "dist/index.js",
   "engines": {
@@ -30,6 +32,7 @@
     "watch": "npm run build && npm link && nodemon"
   },
   "dependencies": {
+    "axios": "^1.8.2",
     "homebridge-lib": "^7.1.4"
   },
   "devDependencies": {
