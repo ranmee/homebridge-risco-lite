@@ -170,7 +170,7 @@ export class RiscoClient {
    */
   async getArmedState(): Promise<ArmState> {
     if (!this.accessToken || !this.sessionId) {
-      throw new Error('Not authenticated. Please initialize the client first.');
+      this.reAuthenticate();
     }
 
     try {
@@ -208,7 +208,7 @@ export class RiscoClient {
    */
   async setArmedState(state: ArmState): Promise<void> {
     if (!this.accessToken || !this.sessionId) {
-      throw new Error('Not authenticated. Please initialize the client first.');
+      this.reAuthenticate();
     }
 
     try {
@@ -239,10 +239,5 @@ export class RiscoClient {
       this.log.error('Failed to set arm state:', error);
       throw error;
     }
-  }
-
-  private async refreshSession(): Promise<void> {
-    // TODO: Implement session refresh logic
-    this.log.debug('Refreshing session');
   }
 } 
