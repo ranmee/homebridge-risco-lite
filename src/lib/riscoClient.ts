@@ -147,7 +147,7 @@ export class RiscoClient {
         `${RISCO_BASE_URL}/api/wuws/site/${this.config.siteId}/Login`,
         {
           languageId: 'en-en',
-          pinCode: parseInt(this.config.pinCode, 10),
+          pinCode: this.config.pinCode,
         },
         {
           headers: {
