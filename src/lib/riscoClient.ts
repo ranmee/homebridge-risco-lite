@@ -1,4 +1,4 @@
-import { Logger } from 'homebridge';
+import { Logger, PlatformConfig } from 'homebridge';
 import axios from 'axios';
 
 const RISCO_BASE_URL = 'https://www.riscocloud.com/webapi';
@@ -69,8 +69,13 @@ export class RiscoClient {
   private refreshToken?: string;
   private sessionId?: string;
 
-  constructor(config: RiscoConfig, log: Logger) {
-    this.config = config;
+  constructor(config: PlatformConfig, log: Logger) {
+    this.config = {
+      username: config.riscoUsername as string,
+      password: config.riscoPassword as string,
+      siteId: config.riscoSiteId as string,
+      pinCode: config.riscoPIN as string,
+    };
     this.log = log;
   }
 

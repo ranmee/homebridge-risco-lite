@@ -33,7 +33,7 @@ export class RiscoAlarmPlatform implements DynamicPlatformPlugin {
     this.Service = this.api.hap.Service;
     this.Characteristic = this.api.hap.Characteristic;
 
-    this.riscoClient = new RiscoClient(this.config.risco, this.log);
+    this.riscoClient = new RiscoClient(this.config, this.log);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
