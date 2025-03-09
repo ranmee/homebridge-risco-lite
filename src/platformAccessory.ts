@@ -1,4 +1,8 @@
-import type { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import type {
+  CharacteristicValue,
+  PlatformAccessory,
+  Service,
+} from 'homebridge';
 import { ArmState } from './lib/riscoClient.js';
 import type { RiscoAlarmPlatform } from './platform.js';
 
@@ -16,7 +20,7 @@ export class RiscoSecuritySystemAccessory {
   // Store both current and target states
   private securityState = {
     currentState: 3, // Start DISARMED
-    targetState: 3,  // Start DISARMED
+    targetState: 3, // Start DISARMED
     isConnected: true,
   };
 
@@ -25,24 +29,36 @@ export class RiscoSecuritySystemAccessory {
     private readonly accessory: PlatformAccessory,
   ) {
     // set accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+    this.accessory
+      .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Risco')
       .setCharacteristic(this.platform.Characteristic.Model, 'Security System')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.id || 'Unknown');
+      .setCharacteristic(
+        this.platform.Characteristic.SerialNumber,
+        accessory.context.device.id || 'Unknown',
+      );
 
     // get the SecuritySystem service if it exists, otherwise create a new SecuritySystem service
-    this.service = this.accessory.getService(this.platform.Service.SecuritySystem) || 
+    this.service =
+      this.accessory.getService(this.platform.Service.SecuritySystem) ||
       this.accessory.addService(this.platform.Service.SecuritySystem);
 
     // set the service name, this is what is displayed as the default name on the Home app
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name || 'Risco Alarm');
+    this.service.setCharacteristic(
+      this.platform.Characteristic.Name,
+      accessory.context.device.name || 'Risco Alarm',
+    );
 
     // register handlers for the SecuritySystemCurrentState Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemCurrentState)
+    this.service
+      .getCharacteristic(
+        this.platform.Characteristic.SecuritySystemCurrentState,
+      )
       .onGet(this.getCurrentState.bind(this));
 
     // register handlers for the SecuritySystemTargetState Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemTargetState)
+    this.service
+      .getCharacteristic(this.platform.Characteristic.SecuritySystemTargetState)
       .onSet(this.setTargetState.bind(this))
       .onGet(this.getTargetState.bind(this));
 
@@ -55,14 +71,14 @@ export class RiscoSecuritySystemAccessory {
    */
   private riscoToHomeKit(armState: ArmState): number {
     switch (armState) {
-      case ArmState.NotArmed:
-        return 3; // DISARMED
-      case ArmState.StayArmed:
-        return 0; // STAY_ARM
-      case ArmState.AwayArmed:
-        return 1; // AWAY_ARM
-      default:
-        return 3; // Default to DISARMED
+    case ArmState.NotArmed:
+      return 3; // DISARMED
+    case ArmState.StayArmed:
+      return 0; // STAY_ARM
+    case ArmState.AwayArmed:
+      return 1; // AWAY_ARM
+    default:
+      return 3; // Default to DISARMED
     }
   }
 
@@ -71,16 +87,16 @@ export class RiscoSecuritySystemAccessory {
    */
   private homeKitToRisco(state: number): ArmState {
     switch (state) {
-      case 0: // STAY_ARM
-        return ArmState.StayArmed;
-      case 1: // AWAY_ARM
-        return ArmState.AwayArmed;
-      case 2: // NIGHT_ARM (treat as Stay)
-        return ArmState.StayArmed;
-      case 3: // DISARMED
-        return ArmState.NotArmed;
-      default:
-        return ArmState.NotArmed;
+    case 0: // STAY_ARM
+      return ArmState.StayArmed;
+    case 1: // AWAY_ARM
+      return ArmState.AwayArmed;
+    case 2: // NIGHT_ARM (treat as Stay)
+      return ArmState.StayArmed;
+    case 3: // DISARMED
+      return ArmState.NotArmed;
+    default:
+      return ArmState.NotArmed;
     }
   }
 
@@ -89,18 +105,18 @@ export class RiscoSecuritySystemAccessory {
    */
   private getStateDescription(state: number): string {
     switch (state) {
-      case 0:
-        return 'STAY_ARM (Home)';
-      case 1:
-        return 'AWAY_ARM (Away)';
-      case 2:
-        return 'NIGHT_ARM (Night)';
-      case 3:
-        return 'DISARMED (Off)';
-      case 4:
-        return 'ALARM_TRIGGERED';
-      default:
-        return `Unknown (${state})`;
+    case 0:
+      return 'STAY_ARM (Home)';
+    case 1:
+      return 'AWAY_ARM (Away)';
+    case 2:
+      return 'NIGHT_ARM (Night)';
+    case 3:
+      return 'DISARMED (Off)';
+    case 4:
+      return 'ALARM_TRIGGERED';
+    default:
+      return `Unknown (${state})`;
     }
   }
 
@@ -111,10 +127,10 @@ export class RiscoSecuritySystemAccessory {
     try {
       const riscoState = await this.platform.riscoClient.getArmedState();
       const homekitState = this.riscoToHomeKit(riscoState);
-      
+
       this.securityState.currentState = homekitState;
       this.securityState.targetState = homekitState;
-      
+
       this.service.updateCharacteristic(
         this.platform.Characteristic.SecuritySystemCurrentState,
         homekitState,
@@ -208,11 +224,11 @@ export class RiscoSecuritySystemAccessory {
     try {
       const riscoState = this.homeKitToRisco(newState);
       await this.platform.riscoClient.setArmedState(riscoState);
-      
+
       // Update both target and current state
       this.securityState.targetState = newState;
       this.securityState.currentState = newState;
-      
+
       this.service.updateCharacteristic(
         this.platform.Characteristic.SecuritySystemCurrentState,
         newState,
