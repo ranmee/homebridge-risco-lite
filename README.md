@@ -55,6 +55,14 @@ Add the following to your Homebridge `config.json` or configure through the Home
 - `riscoSiteId`: Your Risco site ID (required)
 - `riscoPIN`: Your Risco alarm PIN code (required)
 
+## How to get your riscoSiteId
+
+To get your riscoSiteId, login to riscocloud via ChromeBrowser (first login screen), and before providing your PIN (second login page), display source of the page and find string: `<div class="site-name"` ... it will look like:
+
+`<div class="site-name" id="site_12345_div">`
+
+In that case "12345" is your siteId which should be placed in new config file.
+
 ## Usage
 
 Once configured, your Risco alarm system will appear in the Home app as a security system accessory. You can:
